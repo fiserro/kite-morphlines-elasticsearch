@@ -49,6 +49,7 @@ public class LoadElasticsearchBuilder implements CommandBuilder {
 
   public static final String DOCUMENT_LOADER_TYPE = "documentLoader";
   public static final String ELASTICSEARCH_CONFIGURATION = "elasticsearchConfig";
+  public static final String BATCH_SIZE_FIELD = "batchSize";
   public static final String TTL = "ttl";
   public static final String INDEX_NAME = "index";
   public static final String TYPE = "type";
@@ -74,6 +75,7 @@ public class LoadElasticsearchBuilder implements CommandBuilder {
     private final FieldExpression indexType;
     private final Set<String> ignoreFields;
     private final int ttl;
+    private final int batchSize;
 
     LoadElasticsearch(CommandBuilder builder, Config config, Command parent, Command child, MorphlineContext context) {
       super(builder, config, parent, child, context);
@@ -84,11 +86,12 @@ public class LoadElasticsearchBuilder implements CommandBuilder {
       indexType = new FieldExpression(getConfigs().getString(config, TYPE), getConfig());
       ignoreFields = new LinkedHashSet<String>(getConfigs().getStringList(config, IGNORE_FIELDS, new ArrayList<String>()));
       ttl = getConfigs().getInt(config, TTL);
+      batchSize = getConfigs().getInt(config, BATCH_SIZE_FIELD, 1000);
       validateArguments();
 
       DocumentLoaderFactory documentLoaderFactory = new DocumentLoaderFactory();
       try {
-        loader = documentLoaderFactory.getClient(loaderType, elasticsearchConfig);
+        loader = documentLoaderFactory.getClient(loaderType, batchSize, elasticsearchConfig);
       } catch (IllegalArgumentException e) {
         throw new MorphlineRuntimeException(e);
       }
@@ -133,6 +136,7 @@ public class LoadElasticsearchBuilder implements CommandBuilder {
 
     @Override
     protected boolean doProcess(Record record) {
+
       Timer.Context timerContext = elapsedTime.time();
 
       try {

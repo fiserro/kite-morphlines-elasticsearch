@@ -38,6 +38,7 @@ import org.slf4j.LoggerFactory;
 
 public class RestDocumentLoader implements DocumentLoader {
 
+  private static final int DEFAULT_BATCH_SIZE = 1000;
   private static final String INDEX_OPERATION_NAME = "index";
   private static final String INDEX_PARAM = "_index";
   private static final String TYPE_PARAM = "_type";
@@ -50,16 +51,22 @@ public class RestDocumentLoader implements DocumentLoader {
 
   private StringBuilder bulkBuilder;
   private HttpClient httpClient;
-
+  private int batchSize = DEFAULT_BATCH_SIZE;
+  private int batchLoad = 0;
+  
   public RestDocumentLoader() {
     serversList = new RoundRobinList<String>(Arrays.asList("http://localhost:9200"));
   }
 
-  public RestDocumentLoader(Collection<String> hostNames) {
-    this(hostNames, new DefaultHttpClient());
+  public RestDocumentLoader(Collection<String> hostNames, int batchSize) {
+    this(hostNames, batchSize, new DefaultHttpClient());
   }
 
   public RestDocumentLoader(Collection<String> hostNames, HttpClient httpClient) {
+    this(hostNames, DEFAULT_BATCH_SIZE, httpClient);
+  }
+
+  public RestDocumentLoader(Collection<String> hostNames, int batchSize, HttpClient httpClient) {
     List<String> hosts = new LinkedList<String>();
     for (String hostName : hostNames) {
       if (!hostName.contains("http://") && !hostName.contains("https://")) {
@@ -70,11 +77,13 @@ public class RestDocumentLoader implements DocumentLoader {
     serversList = new RoundRobinList<String>(hosts);
     bulkBuilder = new StringBuilder();
     this.httpClient = httpClient;
+    this.batchSize = batchSize;
   }
 
   @Override
   public void beginTransaction() throws IOException {
     bulkBuilder = new StringBuilder();
+    batchLoad = 0;
   }
 
   @Override
@@ -86,6 +95,7 @@ public class RestDocumentLoader implements DocumentLoader {
     String entity;
     entity = bulkBuilder.toString();
     bulkBuilder = new StringBuilder();
+    batchLoad = 0;
 
     while (statusCode != HttpStatus.SC_OK && triesCount < serversList.size()) {
       triesCount++;
@@ -113,6 +123,7 @@ public class RestDocumentLoader implements DocumentLoader {
   @Override
   public void rollbackTransaction() throws IOException {
     bulkBuilder = new StringBuilder();
+    batchLoad = 0;
   }
 
   @Override
@@ -130,6 +141,10 @@ public class RestDocumentLoader implements DocumentLoader {
     bulkBuilder.append("\n");
     bulkBuilder.append(document.toBytesArray().toUtf8());
     bulkBuilder.append("\n");
+
+    if (++batchLoad >= batchSize) {
+      commitTransaction();
+    }
   }
 
   @Override

@@ -37,7 +37,7 @@ public class DocumentLoaderFactory {
    *
    * @return
    */
-  public DocumentLoader getClient(String clientType, Config config)
+  public DocumentLoader getClient(String clientType, int batchSize, Config config)
           throws IllegalArgumentException, MorphlineRuntimeException {
     List<String> hostNames = config.getStringList(HOSTS_FIELD);
 
@@ -50,9 +50,9 @@ public class DocumentLoaderFactory {
       if (clusterName == null) {
         throw new MorphlineRuntimeException("No parameter " + CLUSTER_NAME_FIELD + " set");
       }
-      return new TransportDocumentLoader(hostNames, clusterName);
+      return new TransportDocumentLoader(hostNames, clusterName, batchSize);
     } else if (clientType.equalsIgnoreCase(REST_DOCUMENT_LOADER)) {
-      return new RestDocumentLoader(hostNames);
+      return new RestDocumentLoader(hostNames, batchSize);
     }
     throw new IllegalArgumentException("There is no such a client. " + clientType);
   }

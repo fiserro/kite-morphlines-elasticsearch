@@ -16,7 +16,7 @@ limitations under the License. -->
   <modelVersion>4.0.0</modelVersion>
 
   <groupId>com.sematext</groupId>
-  <version>0.1.0</version>
+  <version>0.1.1-SNAPSHOT</version>
   <artifactId>kite-morphlines-elasticsearch</artifactId>
   <name>Kite Morphlines Elasticsearch</name>
 
@@ -35,7 +35,7 @@ limitations under the License. -->
   <properties>
     <kitesdk.version>0.12.0</kitesdk.version>
     <apache.httpclient.version>[4.0,)</apache.httpclient.version>
-    <elasticsearch.version>0.90.12</elasticsearch.version>
+    <elasticsearch.version>1.4.0</elasticsearch.version>
     <junit.version>[1.0.0,)</junit.version>
     <mockito.version>1.8.2</mockito.version>
     <javaVersion>1.7</javaVersion>

@@ -45,6 +45,8 @@ public class TransportDocumentLoader implements DocumentLoader {
   private BulkRequestBuilder bulkRequestBuilder;
 
   private Client client;
+  private int batchSize = 1000;
+  private int batchLoad = 0;
 
   public TransportDocumentLoader() {
     openLocalDiscoveryClient();
@@ -53,8 +55,8 @@ public class TransportDocumentLoader implements DocumentLoader {
   public TransportDocumentLoader(Client client) {
     this.client = client;
   }
-  
-  public TransportDocumentLoader(Collection<String> hostNames, String clusterName) {
+
+  public TransportDocumentLoader(Collection<String> hostNames, String clusterName, int batchSize) {
     serverAddresses = new LinkedList<InetSocketTransportAddress>();
     for (String hostName : hostNames) {
       String[] hostPort = hostName.trim().split(":");
@@ -62,6 +64,7 @@ public class TransportDocumentLoader implements DocumentLoader {
       int port = hostPort.length == 2 ? Integer.parseInt(hostPort[1].trim()) : DEFAULT_PORT;
       serverAddresses.add(new InetSocketTransportAddress(host, port));
     }
+    this.batchSize = batchSize;
     openClient(clusterName);
   }
 
@@ -73,6 +76,7 @@ public class TransportDocumentLoader implements DocumentLoader {
   @Override
   public void beginTransaction() throws IOException {
     bulkRequestBuilder = client.prepareBulk();
+    batchLoad = 0;
   }
 
   @Override
@@ -85,12 +89,14 @@ public class TransportDocumentLoader implements DocumentLoader {
       }
     } finally {
       bulkRequestBuilder = client.prepareBulk();
+      batchLoad = 0;
     }
   }
 
   @Override
   public void rollbackTransaction() throws IOException {
     bulkRequestBuilder = null;
+    batchLoad = 0;
   }
 
   @Override
@@ -105,6 +111,10 @@ public class TransportDocumentLoader implements DocumentLoader {
       indexRequestBuilder.setTTL(ttlMs);
     }
     bulkRequestBuilder.add(indexRequestBuilder);
+
+    if (++batchLoad >= batchSize) {
+      commitTransaction();
+    }
   }
 
   @Override
