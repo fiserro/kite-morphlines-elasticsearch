@@ -17,9 +17,14 @@
 package com.sematext.morphline.elasticsearch;
 
 import com.google.common.annotations.VisibleForTesting;
+
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedList;
+import java.util.List;
+
+import org.elasticsearch.action.bulk.BulkItemResponse;
 import org.elasticsearch.action.bulk.BulkRequestBuilder;
 import org.elasticsearch.action.bulk.BulkResponse;
 import org.elasticsearch.action.index.IndexRequestBuilder;
@@ -37,17 +42,22 @@ import org.slf4j.LoggerFactory;
 
 public class TransportDocumentLoader implements DocumentLoader {
 
-  public static final int DEFAULT_PORT = 9300;
-  
   private static final Logger LOGGER = LoggerFactory.getLogger(TransportDocumentLoader.class);
-  
+
+  public static final int DEFAULT_PORT = 9300;
+  private static final int DEFAULT_RETRY_COUNT = -1;
+  private static final int DEFAULT_RETRY_SLEEP = 200;
+
   private Collection<InetSocketTransportAddress> serverAddresses;
-  private BulkRequestBuilder bulkRequestBuilder;
+//  private BulkRequestBuilder bulkRequestBuilder;
 
   private Client client;
   private int batchSize = 1000;
-  private int batchLoad = 0;
-
+//  private int batchLoad = 0;
+  private List<IndexRequestBuilder> batch = new ArrayList<>(batchSize);
+  private int retryCount = DEFAULT_RETRY_COUNT; // TODO by config
+  private int retrySleep = DEFAULT_RETRY_SLEEP; // TODO by config
+  
   public TransportDocumentLoader() {
     openLocalDiscoveryClient();
   }
@@ -68,41 +78,112 @@ public class TransportDocumentLoader implements DocumentLoader {
     openClient(clusterName);
   }
 
+//  @VisibleForTesting
+//  public void setBulkRequestBuilder(BulkRequestBuilder bulkRequestBuilder) {
+//    this.bulkRequestBuilder = bulkRequestBuilder;
+//  }
+
   @VisibleForTesting
-  public void setBulkRequestBuilder(BulkRequestBuilder bulkRequestBuilder) {
-    this.bulkRequestBuilder = bulkRequestBuilder;
+  public void setRetryCount(int retryCount) {
+    this.retryCount = retryCount;
+  }
+
+  @VisibleForTesting
+  public void setRetrySleep(int retrySleep) {
+    this.retrySleep = retrySleep;
+  }
+
+  @VisibleForTesting
+  public BulkRequestBuilder createBulkBuilder() {
+    return client.prepareBulk();
   }
 
   @Override
-  public void beginTransaction() throws IOException {
-    bulkRequestBuilder = client.prepareBulk();
-    batchLoad = 0;
+  public void beginTransaction() {
+//    bulkRequestBuilder = client.prepareBulk();
+//    batchLoad = 0;
+    batch = new ArrayList<>(batchSize);
   }
 
   @Override
   public void commitTransaction() throws Exception {
-    try {
-      LOGGER.debug("Sending bulk to elasticsearch cluster");
-      BulkResponse bulkResponse = bulkRequestBuilder.execute().actionGet();
-      if (bulkResponse.hasFailures()) {
-        throw new MorphlineRuntimeException(bulkResponse.buildFailureMessage());
+    sendBatch();
+  }
+
+  private void sendBatch() {
+    int tryNum = -1;
+    String failureMessage = null;
+    
+    LOGGER.debug("Sending bulk to elasticsearch cluster");
+
+    BulkRequestBuilder bulkRequestBuilder = createBulkBuilder();
+    for (IndexRequestBuilder indexRequestBuilder : batch) {
+      bulkRequestBuilder.add(indexRequestBuilder);
+    }
+
+    int numOfFaileDocuments = 0;
+
+    while (tryNum++ < retryCount || retryCount < 0) {
+
+      numOfFaileDocuments = 0;
+      BulkResponse bulkResponse;
+      try {
+        bulkResponse = bulkRequestBuilder.execute().actionGet();
+        if (!bulkResponse.hasFailures()) {
+          failureMessage = null;
+          break; // sent all
+        }
+      } catch (Exception e) {
+        failureMessage = e.getMessage();
+        numOfFaileDocuments = batch.size();
+        continue; // failed all
       }
-    } finally {
-      bulkRequestBuilder = client.prepareBulk();
-      batchLoad = 0;
+//      if (failureMessage != null && failureMessage.indexOf("\n") > -1) {
+//        failureMessage = failureMessage.substring(0, failureMessage.indexOf("\n"));
+//      }
+
+      // some sent, some failed - retry only the failed
+      bulkRequestBuilder = createBulkBuilder();
+      failureMessage = bulkResponse.buildFailureMessage();
+      for (BulkItemResponse item : bulkResponse.getItems()) {
+        if (item.isFailed()) {
+          numOfFaileDocuments++;
+          int itemId = item.getItemId();
+          bulkRequestBuilder.add(batch.get(itemId));
+        }
+      }
+      
+      String retriesLeft = retryCount < 0 ? "." : (" (" + (retryCount - tryNum) + " retries lefts).");
+      LOGGER.warn("Sending " + numOfFaileDocuments + "/" + batchSize 
+          + " documents to elasticserach failed because of: " + failureMessage
+          + "\nThe " + (tryNum + 1) + ". retry will be send after " + retrySleep + "ms" + retriesLeft);
+      try {
+        Thread.sleep(retrySleep);
+      } catch (InterruptedException e) {
+        LOGGER.error("Waiting to next retry interupted.", e);
+      }
+    }
+
+//    bulkRequestBuilder = client.prepareBulk();
+    beginTransaction();
+    if (numOfFaileDocuments > 0) {
+      if (failureMessage != null) {
+        throw new MorphlineRuntimeException(failureMessage);
+      } else {
+        throw new MorphlineRuntimeException("No failure message was thrown.");
+      }
     }
   }
 
   @Override
   public void rollbackTransaction() throws IOException {
-    bulkRequestBuilder = null;
-    batchLoad = 0;
+    batch = null;
   }
 
   @Override
   public void addDocument(BytesReference document, String index, String indexType, int ttlMs) throws Exception {
-    if (bulkRequestBuilder == null) {
-      bulkRequestBuilder = client.prepareBulk();
+    if (batch == null) {
+      beginTransaction();
     }
 
     IndexRequestBuilder indexRequestBuilder = null;
@@ -110,10 +191,10 @@ public class TransportDocumentLoader implements DocumentLoader {
     if (ttlMs > 0) {
       indexRequestBuilder.setTTL(ttlMs);
     }
-    bulkRequestBuilder.add(indexRequestBuilder);
+    batch.add(indexRequestBuilder);
 
-    if (++batchLoad >= batchSize) {
-      commitTransaction();
+    if (batch.size() >= batchSize) {
+      sendBatch();
     }
   }
 

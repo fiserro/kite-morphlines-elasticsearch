@@ -17,7 +17,10 @@
 package com.sematext.morphline.elasticsearch;
 
 import java.io.IOException;
+
 import org.elasticsearch.action.ListenableActionFuture;
+import org.elasticsearch.action.bulk.BulkItemResponse;
+import org.elasticsearch.action.bulk.BulkItemResponse.Failure;
 import org.elasticsearch.action.bulk.BulkRequestBuilder;
 import org.elasticsearch.action.bulk.BulkResponse;
 import org.elasticsearch.action.index.IndexRequestBuilder;
@@ -27,8 +30,11 @@ import org.elasticsearch.common.io.BytesStream;
 import org.junit.Before;
 import org.junit.Test;
 import org.kitesdk.morphline.api.MorphlineRuntimeException;
+
 import static org.mockito.Matchers.anyString;
+
 import org.mockito.Mock;
+
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -61,13 +67,25 @@ public class TransportDocumentLoaderTest {
             .thenReturn(indexRequestBuilder);
     when(indexRequestBuilder.setSource(document)).thenReturn(indexRequestBuilder);
 
-    fixture = new TransportDocumentLoader(elasticSearchClient);
-    fixture.setBulkRequestBuilder(bulkRequestBuilder);
+    fixture = new TransportDocumentLoader(elasticSearchClient) {
+      @Override
+      public BulkRequestBuilder createBulkBuilder() {
+        return bulkRequestBuilder;
+      }
+    };
+//    fixture.setBulkRequestBuilder();
+    fixture.setRetryCount(0);
+    fixture.setRetrySleep(0);
   }
 
   @Test
   public void shouldAddNewEventWithoutTTL() throws Exception {
+    BulkResponse response = mock(BulkResponse.class);
+    when(bulkRequestBuilder.execute()).thenReturn(action);
+    when(action.actionGet()).thenReturn(response);
+    when(response.hasFailures()).thenReturn(false);
     fixture.addDocument(document, "foo", "bar_type", -1);
+    fixture.commitTransaction();
     verify(indexRequestBuilder).setSource(document);
     verify(bulkRequestBuilder).add(indexRequestBuilder);
   }
@@ -97,6 +115,7 @@ public class TransportDocumentLoaderTest {
     when(bulkRequestBuilder.execute()).thenReturn(action);
     when(action.actionGet()).thenReturn(response);
     when(response.hasFailures()).thenReturn(true);
+    when(response.getItems()).thenReturn(new BulkItemResponse[]{new BulkItemResponse(0, "", new Failure("foor", "bar_type", "id", new IllegalStateException()))});
 
     fixture.addDocument(document, "foo", "bar_type", 10);
     fixture.commitTransaction();
