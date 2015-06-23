@@ -29,7 +29,9 @@ limitations under the License. -->
   </licenses>
 
   <scm>
-    <url>http://svn.apache.org/viewcvs.cgi/maven</url>
+    <url>scm:git:git@github.com:fiserro/kite-morphlines-elasticsearch.git</url>
+    <connection>scm:git:git@github.com:fiserro/kite-morphlines-elasticsearch.git</connection>
+    <developerConnection>scm:git:git@github.com:fiserro/kite-morphlines-elasticsearch.git</developerConnection>
   </scm>
 
   <properties>
