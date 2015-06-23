@@ -33,14 +33,14 @@ limitations under the License. -->
   </scm>
 
   <properties>
-    <kitesdk.version>0.12.0</kitesdk.version>
+    <kitesdk.version>1.0.0</kitesdk.version>
     <apache.httpclient.version>[4.0,)</apache.httpclient.version>
     <elasticsearch.version>1.4.0</elasticsearch.version>
     <junit.version>[1.0.0,)</junit.version>
     <mockito.version>1.8.2</mockito.version>
     <javaVersion>1.7</javaVersion>
 
-    <maven-compiler-plugin.version>3.1</maven-compiler-plugin.version>
+    <maven-compiler-plugin.version>3.2</maven-compiler-plugin.version>
     <maven-source-plugin.version>2.2.1</maven-source-plugin.version>
     <maven-jar-plugin.version>2.4</maven-jar-plugin.version>
     <findbugs-maven-plugin.version>2.5.2</findbugs-maven-plugin.version>
@@ -142,6 +142,12 @@ limitations under the License. -->
             </compilerArgs>
             <showDeprecation>true</showDeprecation>
             <showWarnings>true</showWarnings>
+          </configuration>
+        </plugin>
+        <plugin>
+          <artifactId>maven-surefire-plugin</artifactId>
+          <configuration>
+            <jvm>${env.JAVA_HOME_7}/bin/java</jvm>
           </configuration>
         </plugin>
         <plugin>

@@ -110,6 +110,7 @@ public class TransportDocumentLoader implements DocumentLoader {
     sendBatch();
   }
 
+  // TODO handle StrictDynamicMappingException
   private void sendBatch() {
     int tryNum = -1;
     String failureMessage = null;
@@ -212,7 +213,13 @@ public class TransportDocumentLoader implements DocumentLoader {
    * @param clusterName
    */
   private void openClient(String clusterName) {
-    Settings settings = ImmutableSettings.settingsBuilder().put("cluster.name", clusterName).build();
+    Settings settings = ImmutableSettings.settingsBuilder()
+        .put("cluster.name", clusterName)
+        .put("client.transport.sniff", true) // sniff the rest of machines in cluster
+//        .put("client.transport.ignore_cluster_name", true) // ignore cluster name
+        .put("client.transport.ping_timeout", "30s")
+        .put("client.transport.nodes_sampler_interval", "10s")
+        .build();
 
     TransportClient transportClient = new TransportClient(settings);
     for (InetSocketTransportAddress host : serverAddresses) {
