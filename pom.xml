@@ -16,7 +16,7 @@ limitations under the License. -->
   <modelVersion>4.0.0</modelVersion>
 
   <groupId>com.sematext</groupId>
-  <version>0.1.1-SNAPSHOT</version>
+  <version>0.1.1-SBKS-FORK-SNAPSHOT</version>
   <artifactId>kite-morphlines-elasticsearch</artifactId>
   <name>Kite Morphlines Elasticsearch</name>
 
@@ -56,6 +56,19 @@ limitations under the License. -->
       </snapshots>
     </repository>
   </repositories>
+
+  <distributionManagement>
+    <repository>
+      <id>nexus</id>
+      <name>Releases</name>
+      <url>http://mvn.ccl/nexus/content/repositories/releases</url>
+    </repository>
+    <snapshotRepository>
+      <id>nexus</id>
+      <name>Snapshots</name>
+      <url>http://mvn.ccl/nexus/content/repositories/snapshots</url>
+    </snapshotRepository>
+  </distributionManagement>
 
   <dependencies>
     <dependency>
