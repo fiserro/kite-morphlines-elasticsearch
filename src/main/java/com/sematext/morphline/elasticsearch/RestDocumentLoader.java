@@ -127,7 +127,7 @@ public class RestDocumentLoader implements DocumentLoader {
   }
 
   @Override
-  public void addDocument(BytesReference document, String index, String indexType, int ttlMs) throws Exception {
+  public void addDocument(BytesReference document, String index, String indexType, String id, long ttlMs) throws Exception {
     Map<String, Map<String, String>> parameters = new HashMap<String, Map<String, String>>();
     Map<String, String> indexParameters = new HashMap<String, String>();
     indexParameters.put(INDEX_PARAM, index);

@@ -55,7 +55,7 @@ public interface DocumentLoader {
    *
    * @throws java.lang.Exception
    */
-  void addDocument(BytesReference document, String index, String indexType, int ttlMs) throws Exception;
+  void addDocument(BytesReference document, String index, String indexType, String id, long ttlMs) throws Exception;
 
   /**
    * Shutdown

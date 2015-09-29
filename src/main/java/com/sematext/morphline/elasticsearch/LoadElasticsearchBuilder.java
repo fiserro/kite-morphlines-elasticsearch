@@ -20,10 +20,12 @@ import static org.elasticsearch.common.xcontent.XContentFactory.jsonBuilder;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -42,6 +44,7 @@ import com.codahale.metrics.Timer;
 import com.google.common.annotations.VisibleForTesting;
 import com.typesafe.config.Config;
 
+import static org.elasticsearch.common.xcontent.XContentFactory.*;
 /**
  * A command that loads a record into an Elasticsearch server.
  */
@@ -65,6 +68,27 @@ public class LoadElasticsearchBuilder implements CommandBuilder {
     return new LoadElasticsearch(this, config, parent, child, context);
   }
 
+  public static void main(String[] args) throws Exception {
+    List<String> hostNames = Arrays.asList("es4-1.us-w2.aws.ccl",
+              "es4-2.us-w2.aws.ccl",
+              "es4-10.us-w2.aws.ccl",
+              "es4-11.us-w2.aws.ccl",
+              "es43.us-w2.aws.ccl",
+              "es44.us-w2.aws.ccl",
+              "es45.us-w2.aws.ccl",
+              "es46.us-w2.aws.ccl");
+    TransportDocumentLoader loader = new TransportDocumentLoader(hostNames, "es4", 1);
+    int id = 2;
+    XContentBuilder builder = jsonBuilder()
+    .startObject()
+        .field("id", id)
+//        .field("like_count", 13)
+        .field("share_count", 1)
+        .field("message", "mrdka z krtka2")
+    .endObject();
+    loader.addDocument(builder.bytes(), "twitter_v1_test", "tweet", ""+id, -1);
+  }
+
   ///////////////////////////////////////////////////////////////////////////////
   // Nested classes:
   ///////////////////////////////////////////////////////////////////////////////
@@ -74,7 +98,7 @@ public class LoadElasticsearchBuilder implements CommandBuilder {
     private final FieldExpression indexName;
     private final FieldExpression indexType;
     private final Set<String> ignoreFields;
-    private final int ttl;
+    private final long ttl;
     private final int batchSize;
 
     LoadElasticsearch(CommandBuilder builder, Config config, Command parent, Command child, MorphlineContext context) {
@@ -85,8 +109,8 @@ public class LoadElasticsearchBuilder implements CommandBuilder {
       indexName = new FieldExpression(getConfigs().getString(config, INDEX_NAME), getConfig());
       indexType = new FieldExpression(getConfigs().getString(config, TYPE), getConfig());
       ignoreFields = new LinkedHashSet<String>(getConfigs().getStringList(config, IGNORE_FIELDS, new ArrayList<String>()));
-      ttl = getConfigs().getInt(config, TTL);
-      batchSize = getConfigs().getInt(config, BATCH_SIZE_FIELD, 1000);
+      ttl = getConfigs().getLong(config, TTL);
+      batchSize = getConfigs().getInt(config, BATCH_SIZE_FIELD, 400);
       validateArguments();
 
       DocumentLoaderFactory documentLoaderFactory = new DocumentLoaderFactory();
@@ -162,7 +186,8 @@ public class LoadElasticsearchBuilder implements CommandBuilder {
         documentBuilder.endObject();
         String name = indexName.evaluate(record).get(0).toString();
         String type = indexType.evaluate(record).get(0).toString();
-        loader.addDocument(documentBuilder.bytes(), name, type, ttl);
+        String id = record.getFirstValue("id").toString(); // TODO
+        loader.addDocument(documentBuilder.bytes(), name, type, id, ttl);
       } catch (Exception e) {
         throw new MorphlineRuntimeException(e);
       } finally {

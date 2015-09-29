@@ -15,6 +15,7 @@
  */
 
 package com.sematext.morphline.elasticsearch;
+import static org.elasticsearch.common.xcontent.XContentFactory.*;
 
 import com.google.common.annotations.VisibleForTesting;
 
@@ -27,13 +28,17 @@ import java.util.List;
 import org.elasticsearch.action.bulk.BulkItemResponse;
 import org.elasticsearch.action.bulk.BulkRequestBuilder;
 import org.elasticsearch.action.bulk.BulkResponse;
+import org.elasticsearch.action.index.IndexRequest;
 import org.elasticsearch.action.index.IndexRequestBuilder;
+import org.elasticsearch.action.update.UpdateRequest;
+import org.elasticsearch.action.update.UpdateRequestBuilder;
 import org.elasticsearch.client.Client;
 import org.elasticsearch.client.transport.TransportClient;
 import org.elasticsearch.common.bytes.BytesReference;
 import org.elasticsearch.common.settings.ImmutableSettings;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.transport.InetSocketTransportAddress;
+import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.node.Node;
 import org.elasticsearch.node.NodeBuilder;
 import org.kitesdk.morphline.api.MorphlineRuntimeException;
@@ -45,7 +50,7 @@ public class TransportDocumentLoader implements DocumentLoader {
   private static final Logger LOGGER = LoggerFactory.getLogger(TransportDocumentLoader.class);
 
   public static final int DEFAULT_PORT = 9300;
-  private static final int DEFAULT_RETRY_COUNT = -1;
+  private static final int DEFAULT_RETRY_COUNT = 25;
   private static final int DEFAULT_RETRY_SLEEP = 200;
 
   private Collection<InetSocketTransportAddress> serverAddresses;
@@ -54,7 +59,7 @@ public class TransportDocumentLoader implements DocumentLoader {
   private Client client;
   private int batchSize = 1000;
 //  private int batchLoad = 0;
-  private List<IndexRequestBuilder> batch = new ArrayList<>(batchSize);
+  private List<UpdateRequest> batch = new ArrayList<>(batchSize);
   private int retryCount = DEFAULT_RETRY_COUNT; // TODO by config
   private int retrySleep = DEFAULT_RETRY_SLEEP; // TODO by config
   
@@ -118,8 +123,8 @@ public class TransportDocumentLoader implements DocumentLoader {
     LOGGER.debug("Sending bulk to elasticsearch cluster");
 
     BulkRequestBuilder bulkRequestBuilder = createBulkBuilder();
-    for (IndexRequestBuilder indexRequestBuilder : batch) {
-      bulkRequestBuilder.add(indexRequestBuilder);
+    for (UpdateRequest request : batch) {
+      bulkRequestBuilder.add(request);
     }
 
     int numOfFaileDocuments = 0;
@@ -134,10 +139,10 @@ public class TransportDocumentLoader implements DocumentLoader {
           failureMessage = null;
           break; // sent all
         }
-      } catch (Exception e) {
+      } catch (RuntimeException e) {
         failureMessage = e.getMessage();
         numOfFaileDocuments = batch.size();
-        continue; // failed all
+        throw e;
       }
 //      if (failureMessage != null && failureMessage.indexOf("\n") > -1) {
 //        failureMessage = failureMessage.substring(0, failureMessage.indexOf("\n"));
@@ -182,17 +187,21 @@ public class TransportDocumentLoader implements DocumentLoader {
   }
 
   @Override
-  public void addDocument(BytesReference document, String index, String indexType, int ttlMs) throws Exception {
+  public void addDocument(BytesReference document, String index, String indexType, String id, long ttlMs) throws Exception {
     if (batch == null) {
       beginTransaction();
     }
 
-    IndexRequestBuilder indexRequestBuilder = null;
-    indexRequestBuilder = client.prepareIndex(index, indexType).setSource(document);
+    IndexRequest indexRequest = new IndexRequest(index, indexType)
+        .source(document.toBytes());
     if (ttlMs > 0) {
-      indexRequestBuilder.setTTL(ttlMs);
+      indexRequest.ttl(ttlMs);
     }
-    batch.add(indexRequestBuilder);
+    UpdateRequest updateRequest = new UpdateRequest(index, indexType, id)
+        .doc(document.toBytes())
+            .upsert(indexRequest);
+
+    batch.add(updateRequest);
 
     if (batch.size() >= batchSize) {
       sendBatch();

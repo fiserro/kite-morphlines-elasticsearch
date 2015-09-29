@@ -84,7 +84,7 @@ public class RestDocumentLoaderTest {
     when(httpResponse.getStatusLine()).thenReturn(httpStatus);
     when(httpClient.execute(any(HttpUriRequest.class))).thenReturn(httpResponse);
 
-    fixture.addDocument(document, INDEX_NAME, INDEX_TYPE, -1);
+    fixture.addDocument(document, INDEX_NAME, INDEX_TYPE, "1", -1);
     fixture.commitTransaction();
 
     verify(httpClient).execute(isA(HttpUriRequest.class));
@@ -103,7 +103,7 @@ public class RestDocumentLoaderTest {
     when(httpResponse.getStatusLine()).thenReturn(httpStatus);
     when(httpClient.execute(any(HttpUriRequest.class))).thenReturn(httpResponse);
 
-    fixture.addDocument(document, INDEX_NAME, INDEX_TYPE, 123);
+    fixture.addDocument(document, INDEX_NAME, INDEX_TYPE, "1", 123);
     fixture.commitTransaction();
 
     verify(httpClient).execute(isA(HttpUriRequest.class));
@@ -122,7 +122,7 @@ public class RestDocumentLoaderTest {
     when(httpResponse.getStatusLine()).thenReturn(httpStatus);
     when(httpClient.execute(any(HttpUriRequest.class))).thenReturn(httpResponse);
 
-    fixture.addDocument(document, INDEX_NAME, INDEX_TYPE, 123);
+    fixture.addDocument(document, INDEX_NAME, INDEX_TYPE, "1", 123);
     fixture.commitTransaction();
   }
 
@@ -134,7 +134,7 @@ public class RestDocumentLoaderTest {
     when(httpResponse.getStatusLine()).thenReturn(httpStatus);
     when(httpClient.execute(any(HttpUriRequest.class))).thenReturn(httpResponse);
 
-    fixture.addDocument(document, INDEX_NAME, INDEX_TYPE, 123);
+    fixture.addDocument(document, INDEX_NAME, INDEX_TYPE, "1", 123);
     fixture.commitTransaction();
 
     verify(httpClient, times(2)).execute(isA(HttpUriRequest.class));
