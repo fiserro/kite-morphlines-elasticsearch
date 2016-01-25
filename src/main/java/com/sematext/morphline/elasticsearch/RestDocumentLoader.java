@@ -94,6 +94,7 @@ public class RestDocumentLoader implements DocumentLoader {
 
     String entity;
     entity = bulkBuilder.toString();
+    System.out.println(entity);
     bulkBuilder = new StringBuilder();
     batchLoad = 0;
 
@@ -132,14 +133,19 @@ public class RestDocumentLoader implements DocumentLoader {
     Map<String, String> indexParameters = new HashMap<String, String>();
     indexParameters.put(INDEX_PARAM, index);
     indexParameters.put(TYPE_PARAM, indexType);
+    indexParameters.put("_id", id);
     if (ttlMs > 0) {
       indexParameters.put(TTL_PARAM, Long.toString(ttlMs));
     }
-    parameters.put(INDEX_OPERATION_NAME, indexParameters);
+    parameters.put("update", indexParameters);
 
+    Map<String, Object> doc = new HashMap<>();
+    doc.put("doc_as_upsert", true);
     bulkBuilder.append(jsonBuilder().value(parameters).bytes().toUtf8());
     bulkBuilder.append("\n");
+    bulkBuilder.append("{\"doc\":");
     bulkBuilder.append(document.toBytesArray().toUtf8());
+    bulkBuilder.append(", \"doc_as_upsert\":true}");
     bulkBuilder.append("\n");
 
     if (++batchLoad >= batchSize) {
